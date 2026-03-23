@@ -96,6 +96,29 @@ class TestSolarkCloudEnergySensor:
         assert (DOMAIN, "999999") in sensor.device_info["identifiers"]
         assert sensor.device_info["manufacturer"] == "Dresdencraft"
 
+    def test_sensor_unavailable_when_coordinator_fails(self, mock_coordinator):
+        mock_coordinator.last_update_success = False
+        sensor = SolarkCloudEnergySensor(
+            coordinator=mock_coordinator,
+            label="PV",
+            period="today",
+            name="Test",
+            icon="mdi:flash",
+        )
+        # CoordinatorEntity.available checks last_update_success
+        assert sensor.available is False
+
+    def test_sensor_available_when_coordinator_succeeds(self, mock_coordinator):
+        mock_coordinator.last_update_success = True
+        sensor = SolarkCloudEnergySensor(
+            coordinator=mock_coordinator,
+            label="PV",
+            period="today",
+            name="Test",
+            icon="mdi:flash",
+        )
+        assert sensor.available is True
+
     @pytest.mark.parametrize(
         "label,period,expected",
         [
