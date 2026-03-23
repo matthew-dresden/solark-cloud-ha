@@ -52,6 +52,6 @@ INVERTER_PROFILES = {
 # kwh: usable energy capacity
 # max_power: max continuous charge/discharge power (W)
 BATTERY_PROFILES = {
-    "Fortress eVault MAX 18.5": {"kwh": 18.5, "max_power": 8640},  # 180A × 48V
-    "Fortress eVault 18.5": {"kwh": 18.5, "max_power": 7200},  # 150A × 48V
+    "Fortress eVault MAX 18.5": {"kwh": 18.5, "max_power": 8640},  # 180A x 48V
+    "Fortress eVault 18.5": {"kwh": 18.5, "max_power": 7200},  # 150A x 48V
 }

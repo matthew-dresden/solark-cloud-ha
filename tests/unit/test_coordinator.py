@@ -1,9 +1,10 @@
 """Tests for the SolArk Cloud data coordinator."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from custom_components.solark_cloud.api_client import SolarkCloudApiError
 from custom_components.solark_cloud.const import CONF_IMPORT_HISTORY, CONF_SCAN_INTERVAL_SECONDS
 from custom_components.solark_cloud.coordinator import SolarkCloudCoordinator
@@ -17,7 +18,7 @@ def mock_client():
     client.async_get_current_year_energy.return_value = {"PV": 4600.0, "Load": 7500.0}
     client.async_get_realtime_power.return_value = {"pv_power": 5000.0, "battery_soc": 78.0}
     # _now is a sync method — use MagicMock, not AsyncMock
-    client._now = MagicMock(return_value=datetime(2026, 3, 23, 12, 0, 0, tzinfo=timezone.utc))
+    client._now = MagicMock(return_value=datetime(2026, 3, 23, 12, 0, 0, tzinfo=UTC))
     client.async_get_year_energy.return_value = {
         "2026-01": {"PV": 400.0, "Load": 2800.0},
         "2026-02": {"PV": 2300.0, "Load": 2500.0},

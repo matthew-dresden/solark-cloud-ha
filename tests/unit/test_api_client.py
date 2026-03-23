@@ -3,12 +3,12 @@
 import httpx
 import pytest
 import respx
+
 from custom_components.solark_cloud.api_client import (
     SolarkCloudApiClient,
     SolarkCloudApiError,
     SolarkCloudAuthError,
 )
-
 from tests.conftest import make_energy_day_response, make_energy_year_response, make_token_response_dict
 
 
@@ -235,7 +235,7 @@ class TestSolarkCloudApiClient:
         # Should be keyed by month with labels as sub-keys
         assert isinstance(result, dict)
         assert len(result) > 0
-        for month_key, labels in result.items():
+        for _month_key, labels in result.items():
             assert isinstance(labels, dict)
             assert "Load" in labels
         await client.async_close()

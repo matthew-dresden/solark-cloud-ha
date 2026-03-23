@@ -18,13 +18,13 @@ test: ## Run tests
 	uv run pytest
 
 lint: ## Run linter checks
-	uv run ruff check custom_components/ tests/
+	uv run ruff check src/ tests/
 
 format: ## Format code
-	uv run ruff format custom_components/ tests/
+	uv run ruff format src/ tests/
 
 format-check: ## Check code formatting without modifying files
-	uv run ruff format --check custom_components/ tests/
+	uv run ruff format --check src/ tests/
 
 coverage: ## Run tests with coverage report
 	uv run pytest --cov --cov-report=term-missing --cov-report=html
@@ -35,9 +35,9 @@ clean: ## Remove build artifacts and caches
 pre-push-check: ## Run all validation checks (lint, format, tests with coverage)
 	@echo "Running pre-push checks..."
 	@echo "==> Lint"
-	uv run ruff check custom_components/ tests/
+	uv run ruff check src/ tests/
 	@echo "==> Format check"
-	uv run ruff format --check custom_components/ tests/
+	uv run ruff format --check src/ tests/
 	@echo "==> Tests with coverage"
 	uv run pytest --cov --cov-report=term-missing
 	@echo "All pre-push checks passed."

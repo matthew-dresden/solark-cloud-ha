@@ -1,7 +1,7 @@
 """Data update coordinator for SolArk Cloud."""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from homeassistant.components.recorder.models import StatisticData, StatisticMetaData
@@ -118,7 +118,7 @@ class SolarkCloudCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 cumulative += value
 
                 parts = month_key.split("-")
-                month_dt = datetime(int(parts[0]), int(parts[1]), 1, tzinfo=timezone.utc)
+                month_dt = datetime(int(parts[0]), int(parts[1]), 1, tzinfo=UTC)
 
                 statistics.append(StatisticData(start=month_dt, sum=cumulative, state=value))
 

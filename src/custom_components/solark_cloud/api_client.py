@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from functools import partial
 from typing import Any
 from urllib.parse import urlencode
@@ -44,7 +44,7 @@ class SolarkCloudApiClient:
         """Get current time in the configured timezone."""
         if self._tz_name:
             return datetime.now(tz=ZoneInfo(self._tz_name))
-        return datetime.now(tz=timezone.utc).astimezone()
+        return datetime.now(tz=UTC).astimezone()
 
     async def async_init(self) -> None:
         """Initialize the HTTP client (runs SSL setup in executor to avoid blocking)."""

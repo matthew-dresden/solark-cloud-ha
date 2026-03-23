@@ -2,6 +2,11 @@
 
 from unittest.mock import AsyncMock, patch
 
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.loader import DATA_CUSTOM_COMPONENTS
+
 from custom_components.solark_cloud.const import (
     CONF_BATTERY_COUNT,
     CONF_BATTERY_KWH,
@@ -17,10 +22,6 @@ from custom_components.solark_cloud.const import (
     CONF_TIMEZONE,
     DOMAIN,
 )
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
-from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResultType
-from homeassistant.loader import DATA_CUSTOM_COMPONENTS
 
 
 def _make_user_input(plant_id="999999"):

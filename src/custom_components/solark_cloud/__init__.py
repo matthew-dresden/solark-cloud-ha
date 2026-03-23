@@ -77,8 +77,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                         try:
                             yr_data = await coord.client.async_get_year_energy(plant_id, str(yr))
                             if yr_data:
-                                for month_key, month_vals in yr_data.items():
-                                    for label, value in month_vals.items():
+                                for month_vals in yr_data.values():
+                                    for label in month_vals:
                                         if label not in series:
                                             series[label] = []
                                 # Sum each year's totals

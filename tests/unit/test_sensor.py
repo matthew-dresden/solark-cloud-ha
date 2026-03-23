@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock
 
 import pytest
+
 from custom_components.solark_cloud.const import DOMAIN, ENERGY_LABELS
 from custom_components.solark_cloud.sensor import (
     SolarkCloudEnergySensor,
