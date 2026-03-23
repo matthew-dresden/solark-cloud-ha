@@ -15,6 +15,57 @@ logger = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.SENSOR]
 
+
+async def async_handle_fetch_energy(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
+    """Fetch energy data from SolarkCloud API on demand."""
+    period = call.data["period"]
+    date = call.data["date"]
+
+    for coord in hass.data.get(DOMAIN, {}).values():
+        if isinstance(coord, SolarkCloudCoordinator):
+            plant_id = coord.plant_id
+            if period == "day":
+                raw = await coord.client.async_get_energy_day(plant_id, date)
+            elif period == "month":
+                raw = await coord.client.async_get_energy_month(plant_id, date)
+            elif period == "year":
+                raw = await coord.client.async_get_energy_year(plant_id, date)
+            elif period == "total":
+                now = coord.client._now()
+                current_year = now.year
+                series: dict[str, list[dict[str, object]]] = {}
+                for yr in range(current_year - HISTORY_IMPORT_YEARS, current_year + 1):
+                    try:
+                        yr_data = await coord.client.async_get_year_energy(plant_id, str(yr))
+                        if yr_data:
+                            for month_vals in yr_data.values():
+                                for label in month_vals:
+                                    if label not in series:
+                                        series[label] = []
+                            year_totals: dict[str, float] = {}
+                            for month_vals in yr_data.values():
+                                for label, value in month_vals.items():
+                                    year_totals[label] = year_totals.get(label, 0) + value
+                            for label, total in year_totals.items():
+                                if label not in series:
+                                    series[label] = []
+                                series[label].append({"time": str(yr), "value": round(total, 1)})
+                    except Exception:
+                        logger.debug("No data available for year %s", yr)
+                return {"period": "total", "date": "all", "plant_id": plant_id, "series": series}
+            else:
+                return {"error": f"Unknown period: {period}"}
+
+            series: dict[str, list[dict[str, object]]] = {}
+            for info in raw.get("data", {}).get("infos", []):
+                label = info.get("label", "")
+                series[label] = [
+                    {"time": r.get("time", ""), "value": float(r.get("value", 0))} for r in info.get("records", [])
+                ]
+            return {"period": period, "date": date, "plant_id": plant_id, "series": series}
+
+    return {"error": "No SolArk Cloud integration configured"}
+
 SERVICE_FETCH_ENERGY = "fetch_energy"
 SERVICE_SCHEMA = vol.Schema(
     {
@@ -52,67 +103,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     # Register the fetch_energy service for the custom card
-    async def handle_fetch_energy(call: ServiceCall) -> ServiceResponse:
-        """Fetch energy data from SolarkCloud API on demand."""
-        period = call.data["period"]
-        date = call.data["date"]
-
-        # Find the first coordinator
-        for coord in hass.data.get(DOMAIN, {}).values():
-            if isinstance(coord, SolarkCloudCoordinator):
-                plant_id = coord.plant_id
-                if period == "day":
-                    raw = await coord.client.async_get_energy_day(plant_id, date)
-                elif period == "month":
-                    raw = await coord.client.async_get_energy_month(plant_id, date)
-                elif period == "year":
-                    raw = await coord.client.async_get_energy_year(plant_id, date)
-                elif period == "total":
-                    # Fetch all available years and aggregate yearly totals
-
-                    now = coord.client._now()
-                    current_year = now.year
-                    series: dict[str, list[dict[str, object]]] = {}
-                    for yr in range(current_year - HISTORY_IMPORT_YEARS, current_year + 1):
-                        try:
-                            yr_data = await coord.client.async_get_year_energy(plant_id, str(yr))
-                            if yr_data:
-                                for month_vals in yr_data.values():
-                                    for label in month_vals:
-                                        if label not in series:
-                                            series[label] = []
-                                # Sum each year's totals
-                                year_totals: dict[str, float] = {}
-                                for month_vals in yr_data.values():
-                                    for label, value in month_vals.items():
-                                        year_totals[label] = year_totals.get(label, 0) + value
-                                for label, total in year_totals.items():
-                                    if label not in series:
-                                        series[label] = []
-                                    series[label].append({"time": str(yr), "value": round(total, 1)})
-                        except Exception:
-                            logger.debug("No data available for year %s", yr)
-                    return {"period": "total", "date": "all", "plant_id": plant_id, "series": series}
-                else:
-                    return {"error": f"Unknown period: {period}"}
-
-                # Flatten the response for the frontend
-                series: dict[str, list[dict[str, object]]] = {}
-                for info in raw.get("data", {}).get("infos", []):
-                    label = info.get("label", "")
-                    series[label] = [
-                        {"time": r.get("time", ""), "value": float(r.get("value", 0))} for r in info.get("records", [])
-                    ]
-
-                return {"period": period, "date": date, "plant_id": plant_id, "series": series}
-
-        return {"error": "No SolArk Cloud integration configured"}
-
     if not hass.services.has_service(DOMAIN, SERVICE_FETCH_ENERGY):
         hass.services.async_register(
             DOMAIN,
             SERVICE_FETCH_ENERGY,
-            handle_fetch_energy,
+            lambda call: async_handle_fetch_energy(hass, call),
             schema=SERVICE_SCHEMA,
             supports_response=SupportsResponse.ONLY,
         )
