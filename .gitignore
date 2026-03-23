@@ -1,15 +1,69 @@
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
 *.egg-info/
 *.egg
 dist/
 build/
+.eggs/
+*.whl
 .venv/
+venv/
+.uv/
+
+# Testing / Coverage
 .coverage
+.coverage.*
 htmlcov/
 .pytest_cache/
+.tox/
+.nox/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+.pytype/
+
+# Linting
 .ruff_cache/
-.env
+
+# JavaScript / Node
+node_modules/
+npm-debug.log*
+package-lock.json
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
 .DS_Store
-Thumbs.db
+._*
+
+# Linux
+.directory
+
+# Environment / Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Docker (dev environment state)
+docker/ha-config/*
+!docker/ha-config/configuration.yaml
+
+# Home Assistant artifacts
+home-assistant.log
+home-assistant_v2.db*
+.storage/
+.HA_VERSION
+
+# Distribution
+*.tar.gz
+*.zip
