@@ -91,7 +91,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                                         series[label] = []
                                     series[label].append({"time": str(yr), "value": round(total, 1)})
                         except Exception:
-                            pass
+                            logger.debug("No data available for year %s", yr)
                     return {"period": "total", "date": "all", "plant_id": plant_id, "series": series}
                 else:
                     return {"error": f"Unknown period: {period}"}
