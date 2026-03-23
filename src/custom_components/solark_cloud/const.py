@@ -29,9 +29,34 @@ DEFAULT_BATTERY_COUNT = 0
 DEFAULT_BATTERY_KWH = 18.5
 DEFAULT_BATTERY_MAX_POWER = 8640  # eVault MAX 18.5: 180A * 48V = 8640W per battery
 
+# API configuration
 API_BASE_URL = "https://api.solarkcloud.com"
+API_WEB_ORIGIN = "https://www.solarkcloud.com"
 API_CLIENT_ID = "csp-web"
 API_GRANT_TYPE = "password"
+API_TIMEOUT_SECONDS = 30
+
+# Data resolution: Sol-Ark dongle reports every 5 minutes
+DATA_INTERVAL_MINUTES = 5
+WATTS_TO_KWH_FACTOR = DATA_INTERVAL_MINUTES / 60 / 1000  # W * factor = kWh per interval
+
+# History import: how many years back to fetch on first setup
+HISTORY_IMPORT_YEARS = 5
+
+# Config flow validation ranges
+MAX_INVERTER_COUNT = 20
+MAX_PANEL_COUNT = 500
+MAX_PV_POWER_WATTS = 500000
+MAX_BATTERY_COUNT = 50
+MAX_BATTERY_KWH = 200.0
+MAX_BATTERY_POWER_WATTS = 100000
+MIN_SCAN_INTERVAL_SECONDS = 10
+MAX_SCAN_INTERVAL_SECONDS = 86400
+MIN_INVERTER_RATING_WATTS = 1000
+MAX_INVERTER_RATING_WATTS = 100000
+MIN_PANEL_WATTS = 100
+MAX_PANEL_WATTS = 1000
+MIN_PV_POWER_WATTS = 1000
 
 ENERGY_LABELS = ["Load", "PV", "Export", "Import", "Charge", "Discharge"]
 

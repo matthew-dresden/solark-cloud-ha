@@ -8,7 +8,7 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 
 from .api_client import SolarkCloudApiClient
-from .const import CONF_PLANT_ID, CONF_TIMEZONE, DEFAULT_TIMEZONE, DOMAIN
+from .const import CONF_PLANT_ID, CONF_TIMEZONE, DEFAULT_TIMEZONE, DOMAIN, HISTORY_IMPORT_YEARS
 from .coordinator import SolarkCloudCoordinator
 
 logger = logging.getLogger(__name__)
@@ -73,7 +73,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     now = coord.client._now()
                     current_year = now.year
                     series: dict[str, list[dict[str, object]]] = {}
-                    for yr in range(current_year - 5, current_year + 1):
+                    for yr in range(current_year - HISTORY_IMPORT_YEARS, current_year + 1):
                         try:
                             yr_data = await coord.client.async_get_year_energy(plant_id, str(yr))
                             if yr_data:

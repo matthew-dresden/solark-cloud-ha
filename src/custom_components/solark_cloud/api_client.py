@@ -10,7 +10,14 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
-from .const import API_BASE_URL, API_CLIENT_ID, API_GRANT_TYPE
+from .const import (
+    API_BASE_URL,
+    API_CLIENT_ID,
+    API_GRANT_TYPE,
+    API_TIMEOUT_SECONDS,
+    API_WEB_ORIGIN,
+    WATTS_TO_KWH_FACTOR,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +56,7 @@ class SolarkCloudApiClient:
     async def async_init(self) -> None:
         """Initialize the HTTP client (runs SSL setup in executor to avoid blocking)."""
         loop = asyncio.get_running_loop()
-        self._client = await loop.run_in_executor(None, partial(httpx.AsyncClient, timeout=30))
+        self._client = await loop.run_in_executor(None, partial(httpx.AsyncClient, timeout=API_TIMEOUT_SECONDS))
 
     async def async_close(self) -> None:
         """Close the HTTP client."""
@@ -75,8 +82,8 @@ class SolarkCloudApiClient:
             json=payload,
             headers={
                 "Content-Type": "application/json;charset=UTF-8",
-                "Origin": "https://www.solarkcloud.com",
-                "Referer": "https://www.solarkcloud.com/",
+                "Origin": API_WEB_ORIGIN,
+                "Referer": f"{API_WEB_ORIGIN}/",
             },
         )
         response.raise_for_status()
@@ -180,25 +187,23 @@ class SolarkCloudApiClient:
             label = info.get("label", "")
             raw[label] = [float(r.get("value", 0)) for r in info.get("records", [])]
 
-        interval_hours = 5 / 60  # 5 minutes in hours
-
         totals: dict[str, float] = {}
 
         # PV and Load map directly
         if "PV" in raw:
-            totals["PV"] = round(sum(max(0, v) for v in raw["PV"]) * interval_hours / 1000, 1)
+            totals["PV"] = round(sum(max(0, v) for v in raw["PV"]) * WATTS_TO_KWH_FACTOR, 1)
         if "Load" in raw:
-            totals["Load"] = round(sum(max(0, v) for v in raw["Load"]) * interval_hours / 1000, 1)
+            totals["Load"] = round(sum(max(0, v) for v in raw["Load"]) * WATTS_TO_KWH_FACTOR, 1)
 
         # Grid: positive = import, negative = export
         if "Grid" in raw:
-            totals["Import"] = round(sum(max(0, v) for v in raw["Grid"]) * interval_hours / 1000, 1)
-            totals["Export"] = round(sum(abs(min(0, v)) for v in raw["Grid"]) * interval_hours / 1000, 1)
+            totals["Import"] = round(sum(max(0, v) for v in raw["Grid"]) * WATTS_TO_KWH_FACTOR, 1)
+            totals["Export"] = round(sum(abs(min(0, v)) for v in raw["Grid"]) * WATTS_TO_KWH_FACTOR, 1)
 
         # Battery: positive = discharge, negative = charge
         if "Battery" in raw:
-            totals["Discharge"] = round(sum(max(0, v) for v in raw["Battery"]) * interval_hours / 1000, 1)
-            totals["Charge"] = round(sum(abs(min(0, v)) for v in raw["Battery"]) * interval_hours / 1000, 1)
+            totals["Discharge"] = round(sum(max(0, v) for v in raw["Battery"]) * WATTS_TO_KWH_FACTOR, 1)
+            totals["Charge"] = round(sum(abs(min(0, v)) for v in raw["Battery"]) * WATTS_TO_KWH_FACTOR, 1)
 
         return totals
 

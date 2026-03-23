@@ -19,6 +19,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
     ENERGY_LABELS,
+    HISTORY_IMPORT_YEARS,
 )
 
 logger = logging.getLogger(__name__)
@@ -83,8 +84,8 @@ class SolarkCloudCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         now = self.client._now()
         current_year = now.year
 
-        # Import current year and up to 4 previous years
-        years_to_import = [str(y) for y in range(current_year - 4, current_year + 1)]
+        # Import current year and previous years
+        years_to_import = [str(y) for y in range(current_year - HISTORY_IMPORT_YEARS, current_year + 1)]
 
         logger.info("Importing historical statistics for years: %s", years_to_import)
 
