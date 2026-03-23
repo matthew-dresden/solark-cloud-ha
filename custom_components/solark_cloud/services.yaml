@@ -1,0 +1,23 @@
+fetch_energy:
+  name: Fetch Energy Data
+  description: Fetch energy data from the SolarkCloud API for a given period and date.
+  fields:
+    period:
+      name: Period
+      description: The time period (day, month, year, or total for all time).
+      required: true
+      example: "day"
+      selector:
+        select:
+          options:
+            - "day"
+            - "month"
+            - "year"
+            - "total"
+    date:
+      name: Date
+      description: The date to fetch (YYYY-MM-DD for day/month, YYYY for year, ignored for total).
+      required: true
+      example: "2025-07-15"
+      selector:
+        text:

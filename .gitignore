@@ -11,7 +11,5 @@ htmlcov/
 .pytest_cache/
 .ruff_cache/
 .env
-*.html
-!docs/examples/*.html
 .DS_Store
 Thumbs.db
