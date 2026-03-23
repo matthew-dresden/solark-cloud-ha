@@ -1,0 +1,16 @@
+# Home Assistant development instance
+# Runs inside the devcontainer via Docker-in-Docker
+# The integration source is bind-mounted for live development
+
+services:
+  homeassistant:
+    container_name: ha-dev
+    image: ghcr.io/home-assistant/home-assistant:stable
+    restart: unless-stopped
+    volumes:
+      - ./ha-config:/config
+      - ../src/custom_components:/config/custom_components:ro
+    ports:
+      - "8123:8123"
+    environment:
+      - TZ=America/Detroit

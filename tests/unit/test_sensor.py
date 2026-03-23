@@ -3,6 +3,8 @@
 from unittest.mock import MagicMock
 
 import pytest
+from homeassistant.components.sensor import SensorStateClass
+
 from custom_components.solark_cloud.const import DOMAIN, ENERGY_LABELS
 from custom_components.solark_cloud.sensor import (
     SolarkCloudEnergySensor,
@@ -94,6 +96,29 @@ class TestSolarkCloudEnergySensor:
         assert (DOMAIN, "999999") in sensor.device_info["identifiers"]
         assert sensor.device_info["manufacturer"] == "Dresdencraft"
 
+    def test_sensor_unavailable_when_coordinator_fails(self, mock_coordinator):
+        mock_coordinator.last_update_success = False
+        sensor = SolarkCloudEnergySensor(
+            coordinator=mock_coordinator,
+            label="PV",
+            period="today",
+            name="Test",
+            icon="mdi:flash",
+        )
+        # CoordinatorEntity.available checks last_update_success
+        assert sensor.available is False
+
+    def test_sensor_available_when_coordinator_succeeds(self, mock_coordinator):
+        mock_coordinator.last_update_success = True
+        sensor = SolarkCloudEnergySensor(
+            coordinator=mock_coordinator,
+            label="PV",
+            period="today",
+            name="Test",
+            icon="mdi:flash",
+        )
+        assert sensor.available is True
+
     @pytest.mark.parametrize(
         "label,period,expected",
         [
@@ -109,6 +134,45 @@ class TestSolarkCloudEnergySensor:
             coordinator=mock_coordinator, label=label, period=period, name="Test", icon="mdi:flash"
         )
         assert sensor.native_value == expected
+
+    def test_extra_state_attributes_today(self, mock_coordinator):
+        """Today sensors include self_sufficiency_ratio and net_metering_kwh."""
+        sensor = SolarkCloudEnergySensor(
+            coordinator=mock_coordinator,
+            label="PV",
+            period="today",
+            name="Solar Production Today",
+            icon="mdi:solar-power-variant",
+        )
+        attrs = sensor.extra_state_attributes
+        assert attrs is not None
+        # Load=59.0, Import=41.3 -> self_sufficiency = 1 - (41.3 / 59.0) = 0.300
+        assert attrs["self_sufficiency_ratio"] == round(1 - (41.3 / 59.0), 3)
+        # Export=6.0, Import=41.3 -> net_metering = 6.0 - 41.3 = -35.3
+        assert attrs["net_metering_kwh"] == round(6.0 - 41.3, 1)
+
+    def test_extra_state_attributes_none_for_month(self, mock_coordinator):
+        """Non-today sensors return None for extra_state_attributes."""
+        sensor = SolarkCloudEnergySensor(
+            coordinator=mock_coordinator,
+            label="PV",
+            period="month",
+            name="Solar Production This Month",
+            icon="mdi:solar-power-variant",
+        )
+        assert sensor.extra_state_attributes is None
+
+    def test_extra_state_attributes_none_when_no_data(self, mock_coordinator):
+        """extra_state_attributes returns None when coordinator data is None."""
+        mock_coordinator.data = None
+        sensor = SolarkCloudEnergySensor(
+            coordinator=mock_coordinator,
+            label="PV",
+            period="today",
+            name="Test",
+            icon="mdi:flash",
+        )
+        assert sensor.extra_state_attributes is None
 
 
 class TestSolarkCloudRealtimeSensor:
@@ -223,3 +287,43 @@ class TestAsyncSetupEntry:
 
         unique_ids = [e.unique_id for e in added]
         assert len(unique_ids) == len(set(unique_ids)), "Duplicate unique_ids found"
+
+    async def test_realtime_sensors_created_before_energy_sensors(self, mock_coordinator):
+        """Real-time power sensors should appear before energy total sensors."""
+        hass = MagicMock()
+        hass.data = {DOMAIN: {"test_entry": mock_coordinator}}
+        entry = MagicMock()
+        entry.entry_id = "test_entry"
+
+        added: list = []
+        await async_setup_entry(hass, entry, added.extend)
+
+        first_energy_index = next(i for i, e in enumerate(added) if isinstance(e, SolarkCloudEnergySensor))
+        last_realtime_index = max(i for i, e in enumerate(added) if isinstance(e, SolarkCloudRealtimeSensor))
+        assert last_realtime_index < first_energy_index, (
+            "All real-time sensors should be created before any energy sensors"
+        )
+
+    async def test_today_sensors_use_total_increasing(self, mock_coordinator):
+        """Today energy sensors should use TOTAL_INCREASING for HA Energy dashboard compatibility."""
+        hass = MagicMock()
+        hass.data = {DOMAIN: {"test_entry": mock_coordinator}}
+        entry = MagicMock()
+        entry.entry_id = "test_entry"
+
+        added: list = []
+        await async_setup_entry(hass, entry, added.extend)
+
+        energy_sensors = [e for e in added if isinstance(e, SolarkCloudEnergySensor)]
+        today_sensors = [e for e in energy_sensors if e._period == "today"]
+        month_sensors = [e for e in energy_sensors if e._period == "month"]
+        year_sensors = [e for e in energy_sensors if e._period == "year_totals"]
+
+        for sensor in today_sensors:
+            assert sensor.state_class == SensorStateClass.TOTAL_INCREASING, (
+                f"Today sensor {sensor.name} should use TOTAL_INCREASING"
+            )
+        for sensor in month_sensors:
+            assert sensor.state_class == SensorStateClass.TOTAL, f"Month sensor {sensor.name} should use TOTAL"
+        for sensor in year_sensors:
+            assert sensor.state_class == SensorStateClass.TOTAL, f"Year sensor {sensor.name} should use TOTAL"

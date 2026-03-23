@@ -3,9 +3,10 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from homeassistant.core import HomeAssistant
+
 from custom_components.solark_cloud import async_setup_entry, async_unload_entry
 from custom_components.solark_cloud.const import DOMAIN
-from homeassistant.core import HomeAssistant
 
 
 @pytest.fixture

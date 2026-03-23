@@ -1,7 +1,7 @@
 """Data update coordinator for SolArk Cloud."""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from homeassistant.components.recorder.models import StatisticData, StatisticMetaData
@@ -9,6 +9,7 @@ from homeassistant.components.recorder.statistics import async_add_external_stat
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfEnergy
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.issue_registry import IssueSeverity, async_create_issue, async_delete_issue
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api_client import SolarkCloudApiClient, SolarkCloudApiError
@@ -19,6 +20,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
     ENERGY_LABELS,
+    HISTORY_IMPORT_YEARS,
 )
 
 logger = logging.getLogger(__name__)
@@ -66,7 +68,7 @@ class SolarkCloudCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             realtime = await self.client.async_get_realtime_power(self.plant_id)
 
             now = self.client._now()
-            return {
+            result = {
                 "today": today_data,
                 "month": month_data,
                 "year_totals": year_data,
@@ -75,7 +77,18 @@ class SolarkCloudCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "plant_id": self.plant_id,
                 "last_updated": now.isoformat(),
             }
+            async_delete_issue(self.hass, DOMAIN, "api_unreachable")
+            return result
         except SolarkCloudApiError as err:
+            async_create_issue(
+                self.hass,
+                DOMAIN,
+                "api_unreachable",
+                is_fixable=False,
+                severity=IssueSeverity.ERROR,
+                translation_key="api_unreachable",
+                translation_placeholders={"error": str(err)},
+            )
             raise UpdateFailed(f"Error fetching SolArk Cloud data: {err}") from err
 
     async def _async_import_history(self) -> None:
@@ -83,8 +96,8 @@ class SolarkCloudCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         now = self.client._now()
         current_year = now.year
 
-        # Import current year and up to 4 previous years
-        years_to_import = [str(y) for y in range(current_year - 4, current_year + 1)]
+        # Import current year and previous years
+        years_to_import = [str(y) for y in range(current_year - HISTORY_IMPORT_YEARS, current_year + 1)]
 
         logger.info("Importing historical statistics for years: %s", years_to_import)
 
@@ -118,7 +131,7 @@ class SolarkCloudCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 cumulative += value
 
                 parts = month_key.split("-")
-                month_dt = datetime(int(parts[0]), int(parts[1]), 1, tzinfo=timezone.utc)
+                month_dt = datetime(int(parts[0]), int(parts[1]), 1, tzinfo=UTC)
 
                 statistics.append(StatisticData(start=month_dt, sum=cumulative, state=value))
 

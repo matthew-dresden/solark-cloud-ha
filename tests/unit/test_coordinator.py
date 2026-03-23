@@ -1,11 +1,12 @@
 """Tests for the SolArk Cloud data coordinator."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from custom_components.solark_cloud.api_client import SolarkCloudApiError
-from custom_components.solark_cloud.const import CONF_IMPORT_HISTORY, CONF_SCAN_INTERVAL_SECONDS
+from custom_components.solark_cloud.const import CONF_IMPORT_HISTORY, CONF_SCAN_INTERVAL_SECONDS, DOMAIN
 from custom_components.solark_cloud.coordinator import SolarkCloudCoordinator
 
 
@@ -17,7 +18,7 @@ def mock_client():
     client.async_get_current_year_energy.return_value = {"PV": 4600.0, "Load": 7500.0}
     client.async_get_realtime_power.return_value = {"pv_power": 5000.0, "battery_soc": 78.0}
     # _now is a sync method — use MagicMock, not AsyncMock
-    client._now = MagicMock(return_value=datetime(2026, 3, 23, 12, 0, 0, tzinfo=timezone.utc))
+    client._now = MagicMock(return_value=datetime(2026, 3, 23, 12, 0, 0, tzinfo=UTC))
     client.async_get_year_energy.return_value = {
         "2026-01": {"PV": 400.0, "Load": 2800.0},
         "2026-02": {"PV": 2300.0, "Load": 2500.0},
@@ -146,3 +147,31 @@ class TestSolarkCloudCoordinator:
         mock_entry.options = {CONF_SCAN_INTERVAL_SECONDS: 30}
         coord = SolarkCloudCoordinator(hass=hass, client=mock_client, plant_id="999999", entry=mock_entry)
         assert coord.update_interval.total_seconds() == 30
+
+    async def test_creates_repair_issue_on_api_error(self, coordinator, mock_client):
+        """A failed update creates a repair issue for api_unreachable."""
+        from homeassistant.helpers.update_coordinator import UpdateFailed
+
+        mock_client.async_get_today_energy.side_effect = SolarkCloudApiError("connection timeout")
+
+        with (
+            patch("custom_components.solark_cloud.coordinator.async_create_issue") as mock_create,
+            patch("custom_components.solark_cloud.coordinator.async_delete_issue"),
+            pytest.raises(UpdateFailed),
+        ):
+            await coordinator._async_update_data()
+
+        mock_create.assert_called_once()
+        call_kwargs = mock_create.call_args
+        assert call_kwargs[0][1] == DOMAIN
+        assert call_kwargs[0][2] == "api_unreachable"
+
+    async def test_deletes_repair_issue_on_success(self, coordinator, mock_client):
+        """A successful update deletes the api_unreachable repair issue."""
+        with (
+            patch("custom_components.solark_cloud.coordinator.async_create_issue"),
+            patch("custom_components.solark_cloud.coordinator.async_delete_issue") as mock_delete,
+        ):
+            await coordinator._async_update_data()
+
+        mock_delete.assert_called_once_with(coordinator.hass, DOMAIN, "api_unreachable")

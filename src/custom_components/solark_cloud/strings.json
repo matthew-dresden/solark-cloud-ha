@@ -1,0 +1,77 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "SolArk Cloud — System Configuration",
+        "description": "Enter your SolarkCloud credentials and system specifications. These are used to set gauge thresholds on the dashboard.",
+        "data": {
+          "username": "Email",
+          "password": "Password",
+          "plant_id": "Plant ID",
+          "inverter_rating": "Inverter rating (watts)",
+          "inverter_count": "Number of inverters",
+          "panel_count": "Number of solar panels",
+          "panel_watts": "Watts per panel",
+          "max_pv_power": "Max PV array output (watts)",
+          "battery_count": "Number of batteries",
+          "battery_kwh": "Capacity per battery (kWh)",
+          "battery_max_power": "Max battery power (watts)",
+          "scan_interval_seconds": "Update interval (seconds)",
+          "timezone": "Timezone",
+          "import_history": "Import historical data on setup"
+        },
+        "data_description": {
+          "username": "The email address you use to log in to solarkcloud.com.",
+          "password": "The password for your SolArk Cloud account.",
+          "plant_id": "Your plant ID, found in the SolArk Cloud URL after logging in (e.g. solarkcloud.com/plant/detail/123456).",
+          "inverter_rating": "Rated output of a single inverter in watts (e.g. 12000 for a Sol-Ark 12K).",
+          "inverter_count": "How many inverters are installed in parallel at your site.",
+          "panel_count": "Total number of solar panels connected to the system.",
+          "panel_watts": "Rated wattage of each individual solar panel (e.g. 400).",
+          "max_pv_power": "Maximum combined output of the entire PV array in watts. Leave at 0 to auto-calculate from panel count and watts per panel.",
+          "battery_count": "Number of battery units installed in the system.",
+          "battery_kwh": "Usable energy capacity of each battery in kWh (e.g. 18.5 for a Fortress eVault MAX).",
+          "battery_max_power": "Maximum charge or discharge rate per battery in watts (e.g. 8640 for a Fortress eVault MAX).",
+          "scan_interval_seconds": "How often to poll the SolArk Cloud API for new data, in seconds. Default is 60.",
+          "timezone": "IANA timezone for energy calculations (e.g. America/Detroit). Leave blank to use your Home Assistant timezone.",
+          "import_history": "When enabled, historical energy data will be imported during initial setup. This may take several minutes."
+        }
+      },
+      "reconfigure": {
+        "title": "SolArk Cloud — Reconfigure",
+        "description": "Update your system specifications and polling settings. Credentials and plant ID cannot be changed here.",
+        "data": {
+          "scan_interval_seconds": "Update interval (seconds)",
+          "timezone": "Timezone",
+          "inverter_rating": "Inverter rating (watts)",
+          "inverter_count": "Number of inverters",
+          "panel_count": "Number of solar panels",
+          "panel_watts": "Watts per panel",
+          "max_pv_power": "Max PV array output (watts)",
+          "battery_count": "Number of batteries",
+          "battery_kwh": "Capacity per battery (kWh)",
+          "battery_max_power": "Max battery power (watts)"
+        },
+        "data_description": {
+          "scan_interval_seconds": "How often to poll the SolArk Cloud API for new data, in seconds. Default is 60.",
+          "timezone": "IANA timezone for energy calculations (e.g. America/Detroit). Leave blank to use your Home Assistant timezone.",
+          "inverter_rating": "Rated output of a single inverter in watts (e.g. 12000 for a Sol-Ark 12K).",
+          "inverter_count": "How many inverters are installed in parallel at your site.",
+          "panel_count": "Total number of solar panels connected to the system.",
+          "panel_watts": "Rated wattage of each individual solar panel (e.g. 400).",
+          "max_pv_power": "Maximum combined output of the entire PV array in watts. Leave at 0 to auto-calculate from panel count and watts per panel.",
+          "battery_count": "Number of battery units installed in the system.",
+          "battery_kwh": "Usable energy capacity of each battery in kWh (e.g. 18.5 for a Fortress eVault MAX).",
+          "battery_max_power": "Maximum charge or discharge rate per battery in watts (e.g. 8640 for a Fortress eVault MAX)."
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid credentials. Please verify your email and password are correct for solarkcloud.com.",
+      "cannot_connect": "Unable to connect to the SolArk Cloud API. Check your network connection and try again."
+    },
+    "abort": {
+      "already_configured": "This plant is already configured. Use the reconfigure option to update settings."
+    }
+  }
+}

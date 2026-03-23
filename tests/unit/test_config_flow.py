@@ -2,6 +2,11 @@
 
 from unittest.mock import AsyncMock, patch
 
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.loader import DATA_CUSTOM_COMPONENTS
+
 from custom_components.solark_cloud.const import (
     CONF_BATTERY_COUNT,
     CONF_BATTERY_KWH,
@@ -17,10 +22,6 @@ from custom_components.solark_cloud.const import (
     CONF_TIMEZONE,
     DOMAIN,
 )
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
-from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResultType
-from homeassistant.loader import DATA_CUSTOM_COMPONENTS
 
 
 def _make_user_input(plant_id="999999"):
@@ -146,3 +147,36 @@ class TestSolarkCloudConfigFlow:
             )
             assert result2["type"] == FlowResultType.ABORT
             assert result2["reason"] == "already_configured"
+
+    async def test_reconfigure_shows_form(self, hass: HomeAssistant):
+        from unittest.mock import MagicMock
+
+        from custom_components.solark_cloud.config_flow import SolarkCloudConfigFlow
+
+        flow = SolarkCloudConfigFlow()
+        flow.hass = hass
+        # Mock the reconfigure entry with current data
+        mock_entry = MagicMock()
+        mock_entry.data = _make_user_input()
+        flow._get_reconfigure_entry = MagicMock(return_value=mock_entry)
+
+        result = await flow.async_step_reconfigure(user_input=None)
+        assert result["type"] == FlowResultType.FORM
+        assert result["step_id"] == "reconfigure"
+
+    async def test_reconfigure_updates_entry(self, hass: HomeAssistant):
+        from unittest.mock import MagicMock
+
+        from custom_components.solark_cloud.config_flow import SolarkCloudConfigFlow
+
+        flow = SolarkCloudConfigFlow()
+        flow.hass = hass
+        mock_entry = MagicMock()
+        mock_entry.data = _make_user_input()
+        flow._get_reconfigure_entry = MagicMock(return_value=mock_entry)
+        flow.async_update_reload_and_abort = MagicMock(
+            return_value={"type": "abort", "reason": "reconfigure_successful"}
+        )
+
+        await flow.async_step_reconfigure(user_input={"scan_interval_seconds": 30})
+        flow.async_update_reload_and_abort.assert_called_once()
