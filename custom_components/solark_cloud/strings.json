@@ -1,0 +1,25 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "SolArk Cloud Account",
+        "description": "Enter your SolarkCloud credentials and plant ID. Find your plant ID in your SolarkCloud URL: https://www.solarkcloud.com/plants/overview/{PLANT_ID}/...",
+        "data": {
+          "username": "Email",
+          "password": "Password",
+          "plant_id": "Plant ID",
+          "scan_interval_seconds": "Update interval (seconds, default 30)",
+          "timezone": "Timezone (e.g. America/Detroit). Leave blank to use Home Assistant timezone.",
+          "import_history": "Import historical data on setup"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid credentials. Please check your email and password.",
+      "cannot_connect": "Unable to connect to SolarkCloud. Please try again later."
+    },
+    "abort": {
+      "already_configured": "This plant is already configured."
+    }
+  }
+}
