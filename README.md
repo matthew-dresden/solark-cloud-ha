@@ -16,10 +16,17 @@ Home Assistant custom integration for [Sol-Ark](https://sol-ark.com/) solar inve
 - **Timezone aware** — Uses your Home Assistant timezone or a custom IANA timezone
 - **Config flow** — UI-based setup with credential validation
 - **17 sensor entities** grouped under a single device
+- **Historical data import** — Pulls up to 5 years of monthly statistics on first setup
+
+## Data Freshness
+
+The Sol-Ark inverter dongle reports data to SolarkCloud every **5 minutes**. This is the upstream data resolution — no matter how frequently this integration polls, the underlying data updates at 5-minute intervals. The default 30-second polling ensures you see new data within seconds of it appearing in SolarkCloud, but the actual readings advance in 5-minute steps.
+
+For real-time power readings, the integration reads the most recent 5-minute interval from the day endpoint. For daily and monthly energy totals, the data is aggregated from these 5-minute intervals.
 
 ## Sensors
 
-### Real-Time Power (updated every 30 seconds)
+### Real-Time Power (latest 5-minute interval)
 
 | Sensor | Unit | Description |
 |--------|------|-------------|
