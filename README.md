@@ -28,6 +28,23 @@ Home Assistant custom integration for [Sol-Ark](https://sol-ark.com/) solar inve
 - Historical data import (up to 5 years of monthly data on first setup)
 - HACS compatible
 
+## Screenshots
+
+### Day View (5-minute intervals, filled area chart)
+![Day View](docs/screenshots/ss-day.jpg)
+
+### Multi-Day Range (3 days continuous)
+![Multi-Day View](docs/screenshots/ss-multi.jpg)
+
+### Month View (daily bars)
+![Month View](docs/screenshots/ss-month.jpg)
+
+### Year View (monthly bars)
+![Year View](docs/screenshots/ss-year.jpg)
+
+### Total View (yearly bars, all-time)
+![Total View](docs/screenshots/ss-total.jpg)
+
 ## Installation
 
 ### HACS (recommended)
