@@ -10,14 +10,21 @@ Home Assistant custom integration for [Sol-Ark](https://sol-ark.com/) solar inve
 
 - 23 sensor entities: 5 real-time power/battery sensors + 18 energy totals (6 metrics x 3 periods)
 - HA Energy dashboard compatible (daily energy sensors use `total_increasing` state class)
-- Custom Lovelace card with Day/Month/Year/Total tabs and date navigation
-- `fetch_energy` service for on-demand API queries
+- Custom Lovelace card with Day/Month/Year/Total tabs, date navigation, and date range picker
+- Day view: filled area chart with 5-minute resolution, multi-day date range support
+- Month/Year/Total views: bar charts with all 6 energy metrics
+- `fetch_energy` service for on-demand API queries (all periods including total/all-time)
 - Configurable polling interval (10 seconds to 24 hours, default: 60 seconds)
 - System spec configuration (inverter rating, panel count, battery capacity)
 - Reconfigurable settings (change polling interval, system specs, timezone without re-adding)
 - Timezone-aware data (uses HA timezone or a custom IANA timezone)
 - Config flow UI with credential validation
 - Diagnostics support (downloadable diagnostics with sensitive data redacted)
+- Automatic OAuth token refresh (uses refresh_token before re-authenticating)
+- Circuit breaker (stops API calls after 5 consecutive failures, auto-recovers)
+- HA Repairs integration (creates actionable repair issues when API is unreachable)
+- Sensor extra attributes: self-sufficiency ratio and net metering balance (today sensors)
+- SolarkApiProtocol abstraction for future backend extensibility
 - Historical data import (up to 5 years of monthly data on first setup)
 - HACS compatible
 
