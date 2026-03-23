@@ -12,11 +12,13 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.13", "3.14"]
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v5
 
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
@@ -33,9 +35,14 @@ jobs:
       - name: Tests with coverage
         run: uv run pytest tests/ --cov=src/custom_components/solark_cloud --cov-report=term-missing --cov-fail-under=90
 
+      - name: Generate coverage report
+        if: matrix.python-version == '3.14'
+        run: uv run pytest tests/ --cov=src/custom_components/solark_cloud --cov-report=html --no-header -q
+
       - name: Upload coverage
         if: matrix.python-version == '3.14'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: .coverage
+          path: htmlcov/
+          if-no-files-found: ignore
