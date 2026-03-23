@@ -66,6 +66,7 @@ async def async_handle_fetch_energy(hass: HomeAssistant, call: ServiceCall) -> S
 
     return {"error": "No SolArk Cloud integration configured"}
 
+
 SERVICE_FETCH_ENERGY = "fetch_energy"
 SERVICE_SCHEMA = vol.Schema(
     {

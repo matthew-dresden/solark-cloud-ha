@@ -9,12 +9,15 @@ Home Assistant custom integration for [Sol-Ark](https://sol-ark.com/) solar inve
 ## Features
 
 - 23 sensor entities: 5 real-time power/battery sensors + 18 energy totals (6 metrics x 3 periods)
+- HA Energy dashboard compatible (daily energy sensors use `total_increasing` state class)
 - Custom Lovelace card with Day/Month/Year/Total tabs and date navigation
 - `fetch_energy` service for on-demand API queries
 - Configurable polling interval (10 seconds to 24 hours, default: 60 seconds)
 - System spec configuration (inverter rating, panel count, battery capacity)
+- Reconfigurable settings (change polling interval, system specs, timezone without re-adding)
 - Timezone-aware data (uses HA timezone or a custom IANA timezone)
 - Config flow UI with credential validation
+- Diagnostics support (downloadable diagnostics with sensitive data redacted)
 - Historical data import (up to 5 years of monthly data on first setup)
 - HACS compatible
 
@@ -129,6 +132,18 @@ data:
 ```
 
 The response contains a `series` object keyed by metric label (PV, Load, Export, Import, Charge, Discharge), each with an array of `{time, value}` records.
+
+## Reconfiguration
+
+After initial setup, you can change system specifications and polling settings without removing and re-adding the integration. Go to **Settings > Devices & Services > SolArk Cloud > Configure**. Credentials and plant ID cannot be changed through reconfiguration.
+
+## Diagnostics
+
+Download diagnostics data from **Settings > Devices & Services > SolArk Cloud > three-dot menu > Download diagnostics**. Passwords are automatically redacted from the output.
+
+## Future Enhancements
+
+- **Auto-detection of system specs:** The SolArk Cloud API does not currently expose a documented plant info endpoint for querying inverter models, panel counts, or battery configurations. Auto-detection of system specifications will be added when such an endpoint becomes available.
 
 ## Data Freshness
 

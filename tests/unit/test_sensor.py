@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock
 
 import pytest
+from homeassistant.components.sensor import SensorStateClass
 
 from custom_components.solark_cloud.const import DOMAIN, ENERGY_LABELS
 from custom_components.solark_cloud.sensor import (
@@ -224,3 +225,43 @@ class TestAsyncSetupEntry:
 
         unique_ids = [e.unique_id for e in added]
         assert len(unique_ids) == len(set(unique_ids)), "Duplicate unique_ids found"
+
+    async def test_realtime_sensors_created_before_energy_sensors(self, mock_coordinator):
+        """Real-time power sensors should appear before energy total sensors."""
+        hass = MagicMock()
+        hass.data = {DOMAIN: {"test_entry": mock_coordinator}}
+        entry = MagicMock()
+        entry.entry_id = "test_entry"
+
+        added: list = []
+        await async_setup_entry(hass, entry, added.extend)
+
+        first_energy_index = next(i for i, e in enumerate(added) if isinstance(e, SolarkCloudEnergySensor))
+        last_realtime_index = max(i for i, e in enumerate(added) if isinstance(e, SolarkCloudRealtimeSensor))
+        assert last_realtime_index < first_energy_index, (
+            "All real-time sensors should be created before any energy sensors"
+        )
+
+    async def test_today_sensors_use_total_increasing(self, mock_coordinator):
+        """Today energy sensors should use TOTAL_INCREASING for HA Energy dashboard compatibility."""
+        hass = MagicMock()
+        hass.data = {DOMAIN: {"test_entry": mock_coordinator}}
+        entry = MagicMock()
+        entry.entry_id = "test_entry"
+
+        added: list = []
+        await async_setup_entry(hass, entry, added.extend)
+
+        energy_sensors = [e for e in added if isinstance(e, SolarkCloudEnergySensor)]
+        today_sensors = [e for e in energy_sensors if e._period == "today"]
+        month_sensors = [e for e in energy_sensors if e._period == "month"]
+        year_sensors = [e for e in energy_sensors if e._period == "year_totals"]
+
+        for sensor in today_sensors:
+            assert sensor.state_class == SensorStateClass.TOTAL_INCREASING, (
+                f"Today sensor {sensor.name} should use TOTAL_INCREASING"
+            )
+        for sensor in month_sensors:
+            assert sensor.state_class == SensorStateClass.TOTAL, f"Month sensor {sensor.name} should use TOTAL"
+        for sensor in year_sensors:
+            assert sensor.state_class == SensorStateClass.TOTAL, f"Year sensor {sensor.name} should use TOTAL"

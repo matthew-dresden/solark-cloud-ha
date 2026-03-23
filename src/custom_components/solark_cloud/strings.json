@@ -20,6 +20,22 @@
           "timezone": "Timezone (e.g. America/Detroit). Blank = use HA timezone.",
           "import_history": "Import historical data on setup"
         }
+      },
+      "reconfigure": {
+        "title": "SolArk Cloud — Reconfigure",
+        "description": "Update your system specifications and polling settings. Credentials and plant ID cannot be changed here.",
+        "data": {
+          "scan_interval_seconds": "Update interval (seconds, default 60)",
+          "timezone": "Timezone (e.g. America/Detroit). Blank = use HA timezone.",
+          "inverter_rating": "Single inverter rating (watts, e.g. 12000 for Sol-Ark 12K)",
+          "inverter_count": "Number of parallel inverters",
+          "panel_count": "Number of solar panels",
+          "panel_watts": "Watts per panel (e.g. 400)",
+          "max_pv_power": "Total max PV array output (watts). Auto: panels x watts/panel",
+          "battery_count": "Number of batteries",
+          "battery_kwh": "Capacity per battery (kWh, e.g. 18.5 for Fortress eVault MAX)",
+          "battery_max_power": "Max charge/discharge per battery (watts, e.g. 8640 for eVault MAX)"
+        }
       }
     },
     "error": {

@@ -57,40 +57,7 @@ async def async_setup_entry(
 
     entities: list[SensorEntity] = []
 
-    for label in ENERGY_LABELS:
-        description = SENSOR_DESCRIPTIONS.get(label, {"name": label, "icon": "mdi:flash"})
-        # Today sensor
-        entities.append(
-            SolarkCloudEnergySensor(
-                coordinator=coordinator,
-                label=label,
-                period="today",
-                name=f"{description['name']} Today",
-                icon=description["icon"],
-            )
-        )
-        # Month sensor
-        entities.append(
-            SolarkCloudEnergySensor(
-                coordinator=coordinator,
-                label=label,
-                period="month",
-                name=f"{description['name']} This Month",
-                icon=description["icon"],
-            )
-        )
-        # Year sensor
-        entities.append(
-            SolarkCloudEnergySensor(
-                coordinator=coordinator,
-                label=label,
-                period="year_totals",
-                name=f"{description['name']} This Year",
-                icon=description["icon"],
-            )
-        )
-
-    # Real-time power sensors
+    # Real-time power sensors (added first so they appear first in auto-discovered entity lists)
     realtime_sensors = [
         {
             "key": "pv_power",
@@ -137,6 +104,43 @@ async def async_setup_entry(
                 icon=desc["icon"],
                 device_class=desc["device_class"],
                 unit=desc["unit"],
+            )
+        )
+
+    # Energy total sensors (today/month/year)
+    for label in ENERGY_LABELS:
+        description = SENSOR_DESCRIPTIONS.get(label, {"name": label, "icon": "mdi:flash"})
+        # Today sensor (uses TOTAL_INCREASING for HA Energy dashboard compatibility)
+        entities.append(
+            SolarkCloudEnergySensor(
+                coordinator=coordinator,
+                label=label,
+                period="today",
+                name=f"{description['name']} Today",
+                icon=description["icon"],
+                state_class=SensorStateClass.TOTAL_INCREASING,
+            )
+        )
+        # Month sensor
+        entities.append(
+            SolarkCloudEnergySensor(
+                coordinator=coordinator,
+                label=label,
+                period="month",
+                name=f"{description['name']} This Month",
+                icon=description["icon"],
+                state_class=SensorStateClass.TOTAL,
+            )
+        )
+        # Year sensor
+        entities.append(
+            SolarkCloudEnergySensor(
+                coordinator=coordinator,
+                label=label,
+                period="year_totals",
+                name=f"{description['name']} This Year",
+                icon=description["icon"],
+                state_class=SensorStateClass.TOTAL,
             )
         )
 
@@ -190,7 +194,6 @@ class SolarkCloudEnergySensor(CoordinatorEntity[SolarkCloudCoordinator], SensorE
     """Sensor entity for SolArk Cloud energy data."""
 
     _attr_device_class = SensorDeviceClass.ENERGY
-    _attr_state_class = SensorStateClass.TOTAL
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
     _attr_has_entity_name = True
     _attr_suggested_display_precision = 1
@@ -202,9 +205,11 @@ class SolarkCloudEnergySensor(CoordinatorEntity[SolarkCloudCoordinator], SensorE
         period: str,
         name: str,
         icon: str,
+        state_class: SensorStateClass = SensorStateClass.TOTAL,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
+        self._attr_state_class = state_class
         self._label = label
         self._period = period
         self._attr_name = name
