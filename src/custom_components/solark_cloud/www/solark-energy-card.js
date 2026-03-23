@@ -6,7 +6,7 @@ const SC={PV:"#00E676",Battery:"#651FFF",SOC:"#00E5FF",Grid:"#FFD600",Load:"#FF1
 const CH=560;
 
 class SolarkEnergyCard extends HTMLElement{
-  constructor(){super();this._hass=null;this._period="month";this._date=new Date();this._chart=null;this._started=false;}
+  constructor(){super();this._hass=null;this._period="day";this._date=new Date();this._chart=null;this._started=false;}
   setConfig(c){this._config=c||{};}
   set hass(h){
     this._hass=h;
@@ -30,7 +30,7 @@ class SolarkEnergyCard extends HTMLElement{
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
         <div>
           <div style="font-size:15px;font-weight:600;color:#58a6ff">📈 Energy Generation</div>
-          <div id="std" style="font-size:12px;color:#888">Month View — ${this._dd()}</div>
+          <div id="std" style="font-size:12px;color:#888">Day View — ${this._dd()}</div>
         </div>
         <div id="tabs" style="display:flex;gap:4px"></div>
         <div style="display:flex;align-items:center;gap:6px">
@@ -55,7 +55,7 @@ class SolarkEnergyCard extends HTMLElement{
 
     const tabs=this.querySelector("#tabs");
     for(const p of["day","month","year","total"]){
-      const b=document.createElement("button");b.className="xtb"+(p==="month"?" on":"");
+      const b=document.createElement("button");b.className="xtb"+(p==="day"?" on":"");
       b.dataset.p=p;b.textContent=p.charAt(0).toUpperCase()+p.slice(1);
       b.addEventListener("click",()=>this._tab(p));tabs.appendChild(b);
     }
@@ -89,80 +89,100 @@ class SolarkEnergyCard extends HTMLElement{
       const raw=await r.json(),data=raw.service_response||raw;
       if(!data.series||Object.keys(data.series).length===0){
         ct.innerHTML=`<div style="color:#555;text-align:center;padding:200px 0">No data</div>`;return;}
-      
-      if(this._period==="day"){
-        this._renderDay(ct,data,log);
-      }else{
-        this._renderBars(ct,data,log);
-      }
+      this._renderChart(ct,data,log);
     }catch(e){if(log)log.textContent="Error: "+e.message;}
   }
 
-  _renderDay(ct,data,log){
-    ct.innerHTML="";
-    const series=data.series;
-    const cats=new Set();for(const recs of Object.values(series))if(recs)for(const r of recs)cats.add(r.time);
-    const categories=[...cats].sort();
-    const as=[];
-    for(const[label,recs] of Object.entries(series)){
-      if(!recs||recs.length===0)continue;
-      const vm=new Map(recs.map(r=>[r.time,r.value]));
-      as.push({name:label,data:categories.map(c=>vm.get(c)??0),color:SC[label]||"#888"});
-    }
-    const hasSOC=as.some(s=>s.name==="SOC");
-    const sj=JSON.stringify(as.map(s=>({name:s.name,data:s.data})));
-    const cj=JSON.stringify(as.map(s=>s.color));
-    const wj=JSON.stringify(as.map(s=>s.name==="SOC"?2.5:1.5));
-    const xj=JSON.stringify(categories);
-    const fj=JSON.stringify(as.map(s=>s.name==="SOC"?"solid":"gradient"));
-    const iframe=document.createElement("iframe");
-    iframe.style.cssText=`width:100%;height:${CH}px;border:none;border-radius:8px`;
-    iframe.srcdoc=`<!DOCTYPE html><html><head><script src="/local/community/apexcharts.min.js"><\/script>
-<style>*{margin:0;padding:0}body{background:transparent;overflow:hidden}#c{width:100%;height:100%}</style>
-</head><body><div id="c"></div><script>
-new ApexCharts(document.getElementById("c"),{
-chart:{type:"area",height:${CH},background:"transparent",foreColor:"#ccc",toolbar:{show:true},zoom:{enabled:true}},
-series:${sj},colors:${cj},
-xaxis:{categories:${xj},labels:{style:{colors:"#888",fontSize:"10px"},rotate:-45,hideOverlappingLabels:true},tickAmount:24},
-yaxis:[{title:{text:"W",style:{color:"#ccc"}},labels:{style:{colors:"#ccc"},formatter:function(v){return v!=null?Math.round(v).toLocaleString():""}}}${hasSOC?`,{opposite:true,min:0,max:100,seriesName:"SOC",title:{text:"%",style:{color:"#00E5FF"}},labels:{style:{colors:"#00E5FF"},formatter:function(v){return v!=null?Math.round(v)+"%":""}}}`:``}],
-stroke:{curve:"smooth",width:${wj}},
-fill:{type:${fj},gradient:{shadeIntensity:0.8,opacityFrom:0.5,opacityTo:0.05}},
-tooltip:{shared:true,intersect:false,theme:"dark",y:{formatter:function(v,o){if(v==null)return"";var n=o&&o.seriesIndex!==undefined?${sj}[o.seriesIndex].name:"";return n==="SOC"?v.toFixed(1)+"%":Math.round(v).toLocaleString()+" W"}}},
-legend:{show:true,position:"bottom",labels:{colors:"#ccc"},fontSize:"12px"},
-grid:{borderColor:"#333",strokeDashArray:3},theme:{mode:"dark"},dataLabels:{enabled:false}
-}).render();
-<\/script></body></html>`;
-    ct.appendChild(iframe);
-    if(log)log.textContent=`Day: ${as.length} series, ${categories.length} pts (iframe)`;
-  }
-
-  _renderBars(ct,data,log){
+  _renderChart(ct,data,log){
     if(this._chart){try{this._chart.destroy()}catch(_){}this._chart=null;}
     ct.innerHTML="";
-    const unit="kWh",series=data.series;
-    const cats=new Set();for(const recs of Object.values(series))if(recs)for(const r of recs)cats.add(r.time);
-    const categories=[...cats].sort();
-    const as=[],colors=[];
+
+    const isDay=this._period==="day";
+    const isBar=!isDay;
+    const unit=isDay?"W":"kWh";
+    const series=data.series;
+
+    // Build categories and series data
+    const catSet=new Set();
+    for(const recs of Object.values(series))if(recs)for(const r of recs)catSet.add(r.time);
+    const categories=[...catSet].sort();
+
+    const chartSeries=[],chartColors=[],strokeWidths=[];
     for(const[label,recs] of Object.entries(series)){
       if(!recs||recs.length===0)continue;
       const vm=new Map(recs.map(r=>[r.time,r.value]));
-      as.push({name:label,data:categories.map(c=>vm.get(c)??0)});
-      colors.push(SC[label]||"#888");
+      chartSeries.push({name:label,data:categories.map(c=>vm.get(c)??0)});
+      chartColors.push(SC[label]||"#888");
+      strokeWidths.push(label==="SOC"?2.5:1.5);
     }
-    if(as.length===0)return;
-    this._chart=new ApexCharts(ct,{
-      chart:{type:"bar",height:CH,background:"transparent",foreColor:"#ccc",toolbar:{show:true},zoom:{enabled:true}},
-      series:as,colors,
-      plotOptions:{bar:{columnWidth:"60%",borderRadius:3}},
-      xaxis:{categories,labels:{style:{colors:"#888",fontSize:"10px"},rotate:-45,rotateAlways:true}},
-      yaxis:[{title:{text:unit,style:{color:"#ccc"}},labels:{style:{colors:"#ccc"},formatter:v=>v!=null?Math.round(v).toLocaleString():""}}],
-      stroke:{width:0},fill:{opacity:0.85},
-      tooltip:{shared:true,intersect:false,theme:"dark",y:{formatter:(v)=>{if(v==null)return"";return Math.round(v).toLocaleString()+" "+unit;}}},
+    if(chartSeries.length===0)return;
+
+    const hasSOC=chartSeries.some(s=>s.name==="SOC");
+
+    // Y-axes
+    const yaxis=[{
+      title:{text:unit,style:{color:"#ccc"}},
+      labels:{style:{colors:"#ccc"},formatter:v=>v!=null?Math.round(v).toLocaleString():""}
+    }];
+    if(hasSOC){
+      yaxis.push({
+        opposite:true,min:0,max:100,seriesName:"SOC",
+        title:{text:"SOC %",style:{color:"#00E5FF"}},
+        labels:{style:{colors:"#00E5FF"},formatter:v=>v!=null?Math.round(v)+"%":""}
+      });
+    }
+
+    // Chart options — area for day, bar for everything else
+    const opts={
+      chart:{
+        type:isBar?"bar":"area",
+        height:CH,
+        background:"transparent",
+        foreColor:"#ccc",
+        toolbar:{show:true},
+        zoom:{enabled:true}
+      },
+      series:chartSeries,
+      colors:chartColors,
+      xaxis:{
+        categories,
+        labels:{style:{colors:"#888",fontSize:"10px"},rotate:-45,hideOverlappingLabels:true},
+        tickAmount:isDay?24:undefined
+      },
+      yaxis,
+      tooltip:{
+        shared:true,
+        intersect:false,
+        theme:"dark",
+        y:{formatter:(v,o)=>{
+          if(v==null)return"";
+          const n=o&&o.seriesIndex!==undefined?chartSeries[o.seriesIndex]?.name:"";
+          return n==="SOC"?v.toFixed(1)+"%":Math.round(v).toLocaleString()+" "+unit;
+        }}
+      },
       legend:{show:true,position:"bottom",labels:{colors:"#ccc"},fontSize:"12px"},
-      grid:{borderColor:"#333",strokeDashArray:3},theme:{mode:"dark"},dataLabels:{enabled:false},
-    });
+      grid:{borderColor:"#333",strokeDashArray:3},
+      theme:{mode:"dark"},
+      dataLabels:{enabled:false},
+    };
+
+    // Type-specific options
+    if(isBar){
+      opts.plotOptions={bar:{columnWidth:"60%",borderRadius:3}};
+      opts.stroke={width:0};
+      opts.fill={opacity:0.85};
+    }else{
+      // Area chart for day view
+      opts.stroke={curve:"smooth",width:strokeWidths};
+      opts.fill={
+        type:chartSeries.map(s=>s.name==="SOC"?"solid":"gradient"),
+        gradient:{shadeIntensity:0.8,opacityFrom:0.5,opacityTo:0.05}
+      };
+    }
+
+    this._chart=new ApexCharts(ct,opts);
     this._chart.render();
-    if(log)log.textContent=`${as.length} series, ${categories.length} pts`;
+    if(log)log.textContent=`${chartSeries.length} series, ${categories.length} pts`;
   }
 
   _nav(dir){const d=new Date(this._date);if(this._period==="day")d.setDate(d.getDate()+dir);else if(this._period==="month")d.setMonth(d.getMonth()+dir);else d.setFullYear(d.getFullYear()+dir);this._date=d;this._ui();this._fetch();}
