@@ -5,8 +5,11 @@ const SC={PV:"#00E676",Battery:"#651FFF",SOC:"#00E5FF",Grid:"#FFD600",Load:"#FF1
   Export:"#4FC3F7",Import:"#FF8A65",Charge:"#CE93D8",Discharge:"#A5D6A7"};
 const CH=560;
 
+function fmtDate(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
+
 class SolarkEnergyCard extends HTMLElement{
-  constructor(){super();this._hass=null;this._period="day";this._date=new Date();this._chart=null;this._started=false;}
+  constructor(){super();this._hass=null;this._period="day";this._date=new Date();this._endDate=null;this._chart=null;this._started=false;}
   setConfig(c){this._config=c||{};}
   set hass(h){
     this._hass=h;
@@ -19,7 +22,13 @@ class SolarkEnergyCard extends HTMLElement{
   }
   _dd(){
     const d=this._date;
-    if(this._period==="day")return d.toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"});
+    if(this._period==="day"){
+      const s=d.toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"});
+      if(this._endDate&&fmtDate(this._endDate)!==fmtDate(this._date)){
+        return s+" → "+this._endDate.toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"});
+      }
+      return s;
+    }
     if(this._period==="month")return d.toLocaleDateString("en-US",{year:"numeric",month:"long"});
     if(this._period==="year")return""+d.getFullYear();return"All Time";
   }
@@ -33,12 +42,21 @@ class SolarkEnergyCard extends HTMLElement{
           <div id="std" style="font-size:12px;color:#888">Day View — ${this._dd()}</div>
         </div>
         <div id="tabs" style="display:flex;gap:4px"></div>
-        <div style="display:flex;align-items:center;gap:6px">
-          <button class="xb" id="prev">‹</button>
-          <span id="dd" class="xb" style="width:auto;padding:0 12px;min-width:100px;text-align:center;font-size:14px">${this._dd()}</span>
-          <button class="xb" id="next">›</button>
-          <button class="xb" id="cal">📅</button>
-          <input type="date" id="di" style="position:absolute;opacity:0;width:0;height:0">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:4px">
+            <button class="xb" id="prev">‹</button>
+            <span id="dd" class="xb" style="width:auto;padding:0 12px;min-width:100px;text-align:center;font-size:14px">${this._dd()}</span>
+            <button class="xb" id="next">›</button>
+            <button class="xb" id="cal">📅</button>
+            <input type="date" id="di" style="position:absolute;opacity:0;width:0;height:0">
+          </div>
+          <div id="rangeBox" style="display:flex;align-items:center;gap:4px">
+            <span style="color:#888;font-size:12px">From</span>
+            <input type="date" id="dfrom" class="dinput">
+            <span style="color:#888;font-size:12px">To</span>
+            <input type="date" id="dto" class="dinput">
+            <button class="xb" id="rangeGo" style="width:auto;padding:0 10px;font-size:12px">Go</button>
+          </div>
         </div>
       </div>
       <div id="chartarea" style="width:100%;height:${CH}px;min-height:${CH}px"></div>
@@ -50,6 +68,8 @@ class SolarkEnergyCard extends HTMLElement{
       .xtb{padding:6px 14px;border-radius:6px;border:1px solid #444;background:transparent;color:#aaa;cursor:pointer;font-size:13px}
       .xtb:hover{background:#333;color:#fff}
       .xtb.on{background:#58a6ff;color:#fff;border-color:#58a6ff}
+      .dinput{background:#222;border:1px solid #444;color:#ccc;border-radius:6px;padding:4px 8px;font-size:12px;width:130px}
+      .dinput::-webkit-calendar-picker-indicator{filter:invert(0.7)}
     </style>
     </ha-card>`;
 
@@ -61,12 +81,34 @@ class SolarkEnergyCard extends HTMLElement{
     }
     this.querySelector("#prev").addEventListener("click",()=>this._nav(-1));
     this.querySelector("#next").addEventListener("click",()=>this._nav(1));
-    const cal=()=>{const i=this.querySelector("#di");if(i){const ds=this._dp();i.value=ds.length>=10?ds:ds+"-01";i.showPicker();}};
+    const cal=()=>{const i=this.querySelector("#di");if(i){i.value=fmtDate(this._date);i.showPicker();}};
     this.querySelector("#cal").addEventListener("click",cal);
     this.querySelector("#dd").addEventListener("click",cal);
-    this.querySelector("#di").addEventListener("change",e=>{if(e.target.value){this._date=new Date(e.target.value+"T12:00:00");this._ui();this._fetch();}});
+    this.querySelector("#di").addEventListener("change",e=>{
+      if(e.target.value){this._date=new Date(e.target.value+"T12:00:00");this._endDate=null;this._ui();this._fetch();}
+    });
+
+    // Date range inputs
+    const dfrom=this.querySelector("#dfrom"),dto=this.querySelector("#dto");
+    dfrom.value=fmtDate(this._date);
+    dto.value=fmtDate(this._date);
+    this.querySelector("#rangeGo").addEventListener("click",()=>{
+      const f=dfrom.value,t=dto.value;
+      if(f&&t){
+        this._date=new Date(f+"T12:00:00");
+        this._endDate=new Date(t+"T12:00:00");
+        this._ui();
+        this._fetch();
+      }
+    });
+    this._updateRangeVisibility();
 
     this._initApex();
+  }
+
+  _updateRangeVisibility(){
+    const box=this.querySelector("#rangeBox");
+    if(box) box.style.display=this._period==="day"?"flex":"none";
   }
 
   async _initApex(){
@@ -78,31 +120,62 @@ class SolarkEnergyCard extends HTMLElement{
   async _fetch(){
     const ct=this.querySelector("#chartarea"),log=this.querySelector("#log");
     if(!ct)return;
-    // Show loading but keep container height
-    ct.style.height=CH+"px";
-    ct.style.minHeight=CH+"px";
+    ct.style.height=CH+"px";ct.style.minHeight=CH+"px";
     ct.innerHTML=`<div style="color:#555;text-align:center;padding:${CH/2-20}px 0">Loading...</div>`;
     try{
       let tk="";try{tk=this._hass.auth.data.access_token}catch(_){}
       if(!tk)try{tk=JSON.parse(localStorage.getItem("hassTokens")).access_token}catch(_){}
       if(!tk){if(log)log.textContent="No token";return;}
-      const r=await fetch("/api/services/solark_cloud/fetch_energy?return_response",{
-        method:"POST",headers:{"Authorization":"Bearer "+tk,"Content-Type":"application/json"},
-        body:JSON.stringify({period:this._period,date:this._dp()})});
-      if(!r.ok){if(log)log.textContent=`HTTP ${r.status}`;return;}
-      const raw=await r.json(),data=raw.service_response||raw;
-      if(!data.series||Object.keys(data.series).length===0){
+
+      let data;
+      if(this._period==="day"&&this._endDate&&fmtDate(this._endDate)!==fmtDate(this._date)){
+        // Multi-day range: fetch each day and merge
+        data=await this._fetchRange(tk);
+      }else{
+        const r=await fetch("/api/services/solark_cloud/fetch_energy?return_response",{
+          method:"POST",headers:{"Authorization":"Bearer "+tk,"Content-Type":"application/json"},
+          body:JSON.stringify({period:this._period,date:this._dp()})});
+        if(!r.ok){if(log)log.textContent=`HTTP ${r.status}`;return;}
+        const raw=await r.json();
+        data=raw.service_response||raw;
+      }
+      if(!data||!data.series||Object.keys(data.series).length===0){
         ct.innerHTML=`<div style="color:#555;text-align:center;padding:${CH/2-20}px 0">No data</div>`;return;}
       await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
       this._renderChart(ct,data,log);
     }catch(e){if(log)log.textContent="Error: "+e.message;}
   }
 
+  async _fetchRange(tk){
+    const start=new Date(this._date),end=new Date(this._endDate);
+    if(end<start){const t=new Date(start);start.setTime(end.getTime());end.setTime(t.getTime());}
+    const merged={};
+    let d=new Date(start);
+    while(d<=end){
+      const dateStr=fmtDate(d);
+      try{
+        const r=await fetch("/api/services/solark_cloud/fetch_energy?return_response",{
+          method:"POST",headers:{"Authorization":"Bearer "+tk,"Content-Type":"application/json"},
+          body:JSON.stringify({period:"day",date:dateStr})});
+        if(r.ok){
+          const raw=await r.json();
+          const dayData=(raw.service_response||raw).series||{};
+          for(const[label,records] of Object.entries(dayData)){
+            if(!merged[label])merged[label]=[];
+            for(const rec of records){
+              merged[label].push({time:dateStr+" "+rec.time,value:rec.value});
+            }
+          }
+        }
+      }catch(_){}
+      d=addDays(d,1);
+    }
+    return{period:"day",date:fmtDate(start)+" to "+fmtDate(end),series:merged};
+  }
+
   _renderChart(ct,data,log){
     if(this._chart){try{this._chart.destroy()}catch(_){}this._chart=null;}
-    ct.style.height=CH+"px";
-    ct.style.minHeight=CH+"px";
-    ct.innerHTML="";
+    ct.style.height=CH+"px";ct.style.minHeight=CH+"px";ct.innerHTML="";
 
     const isDay=this._period==="day";
     const isBar=!isDay;
@@ -152,9 +225,28 @@ class SolarkEnergyCard extends HTMLElement{
     if(log)log.textContent=chartSeries.length+" series, "+categories.length+" pts";
   }
 
-  _nav(dir){const d=new Date(this._date);if(this._period==="day")d.setDate(d.getDate()+dir);else if(this._period==="month")d.setMonth(d.getMonth()+dir);else d.setFullYear(d.getFullYear()+dir);this._date=d;this._ui();this._fetch();}
-  _tab(p){this._period=p;this.querySelectorAll(".xtb").forEach(t=>t.classList.toggle("on",t.dataset.p===p));this._ui();this._fetch();}
-  _ui(){const dd=this.querySelector("#dd"),td=this.querySelector("#std");if(dd)dd.textContent=this._dd();if(td)td.textContent=`${this._period.charAt(0).toUpperCase()+this._period.slice(1)} View — ${this._dd()}`;}
+  _nav(dir){
+    const d=new Date(this._date);
+    if(this._period==="day")d.setDate(d.getDate()+dir);
+    else if(this._period==="month")d.setMonth(d.getMonth()+dir);
+    else d.setFullYear(d.getFullYear()+dir);
+    this._date=d;this._endDate=null;this._ui();this._fetch();
+  }
+  _tab(p){
+    this._period=p;
+    this._endDate=null;
+    this.querySelectorAll(".xtb").forEach(t=>t.classList.toggle("on",t.dataset.p===p));
+    this._updateRangeVisibility();
+    this._ui();this._fetch();
+  }
+  _ui(){
+    const dd=this.querySelector("#dd"),td=this.querySelector("#std");
+    if(dd)dd.textContent=this._dd();
+    if(td)td.textContent=this._period.charAt(0).toUpperCase()+this._period.slice(1)+" View — "+this._dd();
+    const dfrom=this.querySelector("#dfrom"),dto=this.querySelector("#dto");
+    if(dfrom)dfrom.value=fmtDate(this._date);
+    if(dto)dto.value=this._endDate?fmtDate(this._endDate):fmtDate(this._date);
+  }
   getCardSize(){return 8;}
   static getStubConfig(){return{};}
 }
