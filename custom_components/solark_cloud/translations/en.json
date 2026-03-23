@@ -2,14 +2,22 @@
   "config": {
     "step": {
       "user": {
-        "title": "SolArk Cloud Account",
-        "description": "Enter your SolarkCloud credentials and plant ID. Find your plant ID in your SolarkCloud URL: https://www.solarkcloud.com/plants/overview/{PLANT_ID}/...",
+        "title": "SolArk Cloud — System Configuration",
+        "description": "Enter your SolarkCloud credentials and system specifications. These are used to set gauge thresholds on the dashboard.",
         "data": {
           "username": "Email",
           "password": "Password",
-          "plant_id": "Plant ID",
-          "scan_interval_seconds": "Update interval (seconds, default 30)",
-          "timezone": "Timezone (e.g. America/Detroit). Leave blank to use Home Assistant timezone.",
+          "plant_id": "Plant ID (from SolarkCloud URL)",
+          "inverter_rating": "Single inverter rating (watts, e.g. 12000 for Sol-Ark 12K)",
+          "inverter_count": "Number of parallel inverters",
+          "panel_count": "Number of solar panels",
+          "panel_watts": "Watts per panel (e.g. 400)",
+          "max_pv_power": "Total max PV array output (watts). Auto: panels × watts/panel",
+          "battery_count": "Number of batteries",
+          "battery_kwh": "Capacity per battery (kWh, e.g. 18.5 for Fortress eVault MAX)",
+          "battery_max_power": "Max charge/discharge per battery (watts, e.g. 8640 for eVault MAX)",
+          "scan_interval_seconds": "Update interval (seconds, default 60)",
+          "timezone": "Timezone (e.g. America/Detroit). Blank = use HA timezone.",
           "import_history": "Import historical data on setup"
         }
       }

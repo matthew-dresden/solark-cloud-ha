@@ -147,6 +147,19 @@ class SolarkCloudApiClient:
                     totals[label] = float(record.get("value", 0))
         return totals
 
+    async def async_get_current_year_energy(self, plant_id: str) -> dict[str, float]:
+        """Get current year's energy totals (sum of all months)."""
+        now = self._now()
+        year = str(now.year)
+
+        data = await self.async_get_energy_year(plant_id, year)
+        totals: dict[str, float] = {}
+        for info in data.get("data", {}).get("infos", []):
+            label = info.get("label", "")
+            year_sum = sum(float(r.get("value", 0)) for r in info.get("records", []))
+            totals[label] = round(year_sum, 1)
+        return totals
+
     async def async_get_today_energy(self, plant_id: str) -> dict[str, float]:
         """Get today's energy from the day endpoint (5-min intervals in watts).
 

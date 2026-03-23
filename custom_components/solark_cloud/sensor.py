@@ -79,14 +79,54 @@ async def async_setup_entry(
                 icon=description["icon"],
             )
         )
+        # Year sensor
+        entities.append(
+            SolarkCloudEnergySensor(
+                coordinator=coordinator,
+                label=label,
+                period="year_totals",
+                name=f"{description['name']} This Year",
+                icon=description["icon"],
+            )
+        )
 
     # Real-time power sensors
     realtime_sensors = [
-        {"key": "pv_power", "name": "Solar Power", "icon": "mdi:solar-power-variant", "device_class": SensorDeviceClass.POWER, "unit": UnitOfPower.WATT},
-        {"key": "load_power", "name": "Home Power", "icon": "mdi:home-lightning-bolt", "device_class": SensorDeviceClass.POWER, "unit": UnitOfPower.WATT},
-        {"key": "grid_power", "name": "Grid Power", "icon": "mdi:transmission-tower", "device_class": SensorDeviceClass.POWER, "unit": UnitOfPower.WATT},
-        {"key": "battery_power", "name": "Battery Power", "icon": "mdi:battery-charging", "device_class": SensorDeviceClass.POWER, "unit": UnitOfPower.WATT},
-        {"key": "battery_soc", "name": "Battery SOC", "icon": "mdi:battery", "device_class": SensorDeviceClass.BATTERY, "unit": PERCENTAGE},
+        {
+            "key": "pv_power",
+            "name": "Solar Power",
+            "icon": "mdi:solar-power-variant",
+            "device_class": SensorDeviceClass.POWER,
+            "unit": UnitOfPower.WATT,
+        },
+        {
+            "key": "load_power",
+            "name": "Home Power",
+            "icon": "mdi:home-lightning-bolt",
+            "device_class": SensorDeviceClass.POWER,
+            "unit": UnitOfPower.WATT,
+        },
+        {
+            "key": "grid_power",
+            "name": "Grid Power",
+            "icon": "mdi:transmission-tower",
+            "device_class": SensorDeviceClass.POWER,
+            "unit": UnitOfPower.WATT,
+        },
+        {
+            "key": "battery_power",
+            "name": "Battery Power",
+            "icon": "mdi:battery-charging",
+            "device_class": SensorDeviceClass.POWER,
+            "unit": UnitOfPower.WATT,
+        },
+        {
+            "key": "battery_soc",
+            "name": "Battery SOC",
+            "icon": "mdi:battery",
+            "device_class": SensorDeviceClass.BATTERY,
+            "unit": PERCENTAGE,
+        },
     ]
     for desc in realtime_sensors:
         entities.append(
@@ -129,7 +169,7 @@ class SolarkCloudRealtimeSensor(CoordinatorEntity[SolarkCloudCoordinator], Senso
         self._attr_unique_id = f"solark_{coordinator.plant_id}_{key}"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, coordinator.plant_id)},
-            "name": f"SolArk Plant {coordinator.plant_id} by Dresdencraft",
+            "name": f"SolArk Plant {coordinator.plant_id}",
             "manufacturer": "Dresdencraft",
             "model": "SolArk Cloud Integration",
         }
@@ -172,7 +212,7 @@ class SolarkCloudEnergySensor(CoordinatorEntity[SolarkCloudCoordinator], SensorE
         self._attr_unique_id = f"solark_{coordinator.plant_id}_{label.lower()}_{period}"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, coordinator.plant_id)},
-            "name": f"SolArk Plant {coordinator.plant_id} by Dresdencraft",
+            "name": f"SolArk Plant {coordinator.plant_id}",
             "manufacturer": "Dresdencraft",
             "model": "SolArk Cloud Integration",
         }
