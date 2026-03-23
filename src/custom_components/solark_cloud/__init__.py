@@ -104,11 +104,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     # Register the fetch_energy service for the custom card
+    async def _handle_fetch_energy(call: ServiceCall) -> ServiceResponse:
+        return await async_handle_fetch_energy(hass, call)
+
     if not hass.services.has_service(DOMAIN, SERVICE_FETCH_ENERGY):
         hass.services.async_register(
             DOMAIN,
             SERVICE_FETCH_ENERGY,
-            lambda call: async_handle_fetch_energy(hass, call),
+            _handle_fetch_energy,
             schema=SERVICE_SCHEMA,
             supports_response=SupportsResponse.ONLY,
         )

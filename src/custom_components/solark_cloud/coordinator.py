@@ -9,6 +9,7 @@ from homeassistant.components.recorder.statistics import async_add_external_stat
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfEnergy
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.issue_registry import IssueSeverity, async_create_issue, async_delete_issue
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api_client import SolarkCloudApiClient, SolarkCloudApiError
@@ -67,7 +68,7 @@ class SolarkCloudCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             realtime = await self.client.async_get_realtime_power(self.plant_id)
 
             now = self.client._now()
-            return {
+            result = {
                 "today": today_data,
                 "month": month_data,
                 "year_totals": year_data,
@@ -76,7 +77,18 @@ class SolarkCloudCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "plant_id": self.plant_id,
                 "last_updated": now.isoformat(),
             }
+            async_delete_issue(self.hass, DOMAIN, "api_unreachable")
+            return result
         except SolarkCloudApiError as err:
+            async_create_issue(
+                self.hass,
+                DOMAIN,
+                "api_unreachable",
+                is_fixable=False,
+                severity=IssueSeverity.ERROR,
+                translation_key="api_unreachable",
+                translation_placeholders={"error": str(err)},
+            )
             raise UpdateFailed(f"Error fetching SolArk Cloud data: {err}") from err
 
     async def _async_import_history(self) -> None:

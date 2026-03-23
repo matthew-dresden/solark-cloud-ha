@@ -232,3 +232,18 @@ class SolarkCloudEnergySensor(CoordinatorEntity[SolarkCloudCoordinator], SensorE
         if value is not None:
             return round(float(value), 1)
         return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return additional state attributes for today sensors."""
+        if self.coordinator.data is None or self._period != "today":
+            return None
+        today = self.coordinator.data.get("today", {})
+        load_today = today.get("Load", 0)
+        import_today = today.get("Import", 0)
+        self_sufficiency = round(1 - (import_today / load_today), 3) if load_today > 0 else 0
+        export_today = today.get("Export", 0)
+        return {
+            "self_sufficiency_ratio": self_sufficiency,
+            "net_metering_kwh": round(export_today - import_today, 1),
+        }

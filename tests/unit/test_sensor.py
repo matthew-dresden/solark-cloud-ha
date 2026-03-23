@@ -135,6 +135,45 @@ class TestSolarkCloudEnergySensor:
         )
         assert sensor.native_value == expected
 
+    def test_extra_state_attributes_today(self, mock_coordinator):
+        """Today sensors include self_sufficiency_ratio and net_metering_kwh."""
+        sensor = SolarkCloudEnergySensor(
+            coordinator=mock_coordinator,
+            label="PV",
+            period="today",
+            name="Solar Production Today",
+            icon="mdi:solar-power-variant",
+        )
+        attrs = sensor.extra_state_attributes
+        assert attrs is not None
+        # Load=59.0, Import=41.3 -> self_sufficiency = 1 - (41.3 / 59.0) = 0.300
+        assert attrs["self_sufficiency_ratio"] == round(1 - (41.3 / 59.0), 3)
+        # Export=6.0, Import=41.3 -> net_metering = 6.0 - 41.3 = -35.3
+        assert attrs["net_metering_kwh"] == round(6.0 - 41.3, 1)
+
+    def test_extra_state_attributes_none_for_month(self, mock_coordinator):
+        """Non-today sensors return None for extra_state_attributes."""
+        sensor = SolarkCloudEnergySensor(
+            coordinator=mock_coordinator,
+            label="PV",
+            period="month",
+            name="Solar Production This Month",
+            icon="mdi:solar-power-variant",
+        )
+        assert sensor.extra_state_attributes is None
+
+    def test_extra_state_attributes_none_when_no_data(self, mock_coordinator):
+        """extra_state_attributes returns None when coordinator data is None."""
+        mock_coordinator.data = None
+        sensor = SolarkCloudEnergySensor(
+            coordinator=mock_coordinator,
+            label="PV",
+            period="today",
+            name="Test",
+            icon="mdi:flash",
+        )
+        assert sensor.extra_state_attributes is None
+
 
 class TestSolarkCloudRealtimeSensor:
     def test_realtime_pv_power(self, mock_coordinator):

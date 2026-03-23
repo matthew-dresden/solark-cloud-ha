@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import time
 from datetime import UTC, datetime
 from functools import partial
 from typing import Any
@@ -16,6 +17,8 @@ from .const import (
     API_GRANT_TYPE,
     API_TIMEOUT_SECONDS,
     API_WEB_ORIGIN,
+    CIRCUIT_BREAKER_COOLDOWN_SECONDS,
+    CIRCUIT_BREAKER_THRESHOLD,
     WATTS_TO_KWH_FACTOR,
 )
 
@@ -45,7 +48,10 @@ class SolarkCloudApiClient:
         self._api_url = api_url.rstrip("/")
         self._tz_name = tz_name
         self._access_token: str | None = None
+        self._refresh_token: str | None = None
         self._client: httpx.AsyncClient | None = None
+        self._consecutive_failures: int = 0
+        self._circuit_open_until: float = 0
 
     def _now(self) -> datetime:
         """Get current time in the configured timezone."""
@@ -92,28 +98,96 @@ class SolarkCloudApiClient:
             msg = f"Authentication failed: {data.get('msg', 'Unknown error')}"
             raise SolarkCloudAuthError(msg)
         self._access_token = data["data"]["access_token"]
+        self._refresh_token = data["data"].get("refresh_token")
         logger.info("Authentication successful")
 
-    async def _async_get(self, url: str) -> dict[str, Any]:
-        """Make an authenticated GET request."""
+    async def _refresh_access_token(self) -> None:
+        """Refresh the access token using the stored refresh token."""
         if self._client is None:
             await self.async_init()
-        if self._access_token is None:
-            await self.async_authenticate()
+        if self._refresh_token is None:
+            msg = "No refresh token available"
+            raise SolarkCloudAuthError(msg)
 
-        response = await self._client.get(
+        url = f"{self._api_url}/oauth/token"
+        payload = {
+            "client_id": API_CLIENT_ID,
+            "grant_type": "refresh_token",
+            "refresh_token": self._refresh_token,
+        }
+        logger.info("Refreshing access token")
+        response = await self._client.post(
             url,
+            json=payload,
             headers={
-                "Authorization": f"Bearer {self._access_token}",
-                "Accept": "application/json",
+                "Content-Type": "application/json;charset=UTF-8",
+                "Origin": API_WEB_ORIGIN,
+                "Referer": f"{API_WEB_ORIGIN}/",
             },
         )
         response.raise_for_status()
         data = response.json()
         if not data.get("success"):
-            msg = f"API request failed: {data.get('msg', 'Unknown error')}"
+            msg = f"Token refresh failed: {data.get('msg', 'Unknown error')}"
+            raise SolarkCloudAuthError(msg)
+        self._access_token = data["data"]["access_token"]
+        self._refresh_token = data["data"].get("refresh_token")
+        logger.info("Token refresh successful")
+
+    async def _async_get(self, url: str) -> dict[str, Any]:
+        """Make an authenticated GET request."""
+        if time.monotonic() < self._circuit_open_until:
+            msg = "Circuit breaker open"
             raise SolarkCloudApiError(msg)
-        return data
+
+        if self._client is None:
+            await self.async_init()
+        if self._access_token is None:
+            await self.async_authenticate()
+
+        try:
+            response = await self._client.get(
+                url,
+                headers={
+                    "Authorization": f"Bearer {self._access_token}",
+                    "Accept": "application/json",
+                },
+            )
+
+            if response.status_code == 401:
+                # Try refreshing the token once before falling back to full re-auth
+                try:
+                    await self._refresh_access_token()
+                except (SolarkCloudAuthError, httpx.HTTPStatusError):
+                    logger.info("Token refresh failed, performing full re-authentication")
+                    await self.async_authenticate()
+
+                response = await self._client.get(
+                    url,
+                    headers={
+                        "Authorization": f"Bearer {self._access_token}",
+                        "Accept": "application/json",
+                    },
+                )
+
+            response.raise_for_status()
+            data = response.json()
+            if not data.get("success"):
+                msg = f"API request failed: {data.get('msg', 'Unknown error')}"
+                raise SolarkCloudApiError(msg)
+
+            self._consecutive_failures = 0
+            return data
+        except Exception:
+            self._consecutive_failures += 1
+            if self._consecutive_failures >= CIRCUIT_BREAKER_THRESHOLD:
+                self._circuit_open_until = time.monotonic() + CIRCUIT_BREAKER_COOLDOWN_SECONDS
+                logger.warning(
+                    "Circuit breaker opened after %d consecutive failures, cooldown %d seconds",
+                    self._consecutive_failures,
+                    CIRCUIT_BREAKER_COOLDOWN_SECONDS,
+                )
+            raise
 
     def _energy_url(self, plant_id: str, period: str, date: str) -> str:
         """Build an energy endpoint URL."""

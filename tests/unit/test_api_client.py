@@ -282,3 +282,108 @@ class TestSolarkCloudApiClient:
         await client.async_close()
         # Call again to verify idempotent behavior
         await client.async_close()
+
+    @respx.mock
+    async def test_stores_refresh_token(self, client, api_url):
+        """async_authenticate stores both access and refresh tokens."""
+        token_data = make_token_response_dict(refresh_token="my-refresh-token")
+        respx.post(f"{api_url}/oauth/token").mock(return_value=httpx.Response(200, json=token_data))
+        await client.async_init()
+        await client.async_authenticate()
+        assert client._refresh_token == "my-refresh-token"
+        await client.async_close()
+
+    @respx.mock
+    async def test_refreshes_token_on_401(self, client, api_url, sample_plant_id):
+        """On 401, the client refreshes the token and retries the request."""
+        # Initial auth
+        token_data = make_token_response_dict()
+        respx.post(f"{api_url}/oauth/token").mock(
+            side_effect=[
+                httpx.Response(200, json=token_data),
+                # Refresh token call
+                httpx.Response(
+                    200,
+                    json=make_token_response_dict(
+                        access_token="refreshed-token",
+                        refresh_token="new-refresh-token",
+                    ),
+                ),
+            ]
+        )
+        year_data = make_energy_year_response()
+        respx.get(url__startswith=f"{api_url}/api/v1/plant/energy/{sample_plant_id}/year").mock(
+            side_effect=[
+                httpx.Response(401, json={"error": "unauthorized"}),
+                httpx.Response(200, json=year_data),
+            ]
+        )
+        await client.async_init()
+        result = await client.async_get_energy_year(sample_plant_id, "2024")
+        assert result["success"] is True
+        assert client._access_token == "refreshed-token"
+        assert client._refresh_token == "new-refresh-token"
+        await client.async_close()
+
+    @respx.mock
+    async def test_circuit_breaker_opens_after_failures(self, client, api_url, sample_plant_id):
+        """Circuit breaker opens after CIRCUIT_BREAKER_THRESHOLD consecutive failures."""
+        from custom_components.solark_cloud.const import CIRCUIT_BREAKER_THRESHOLD
+
+        token_data = make_token_response_dict()
+        respx.post(f"{api_url}/oauth/token").mock(return_value=httpx.Response(200, json=token_data))
+        failed_resp = {"code": 1, "msg": "Server error", "data": {}, "success": False}
+        respx.get(url__startswith=f"{api_url}/api/v1/plant/energy/{sample_plant_id}/year").mock(
+            return_value=httpx.Response(200, json=failed_resp)
+        )
+        await client.async_init()
+
+        for _ in range(CIRCUIT_BREAKER_THRESHOLD):
+            with pytest.raises(SolarkCloudApiError, match="API request failed"):
+                await client.async_get_energy_year(sample_plant_id, "2024")
+
+        # Next call should be rejected by the circuit breaker without hitting the API
+        with pytest.raises(SolarkCloudApiError, match="Circuit breaker open"):
+            await client.async_get_energy_year(sample_plant_id, "2024")
+        await client.async_close()
+
+    @respx.mock
+    async def test_circuit_breaker_resets_on_success(self, client, api_url, sample_plant_id):
+        """A successful request resets the consecutive failure counter."""
+        from custom_components.solark_cloud.const import CIRCUIT_BREAKER_THRESHOLD
+
+        token_data = make_token_response_dict()
+        respx.post(f"{api_url}/oauth/token").mock(return_value=httpx.Response(200, json=token_data))
+
+        failed_resp = {"code": 1, "msg": "Server error", "data": {}, "success": False}
+        year_data = make_energy_year_response()
+
+        # Fail (threshold - 1) times, then succeed, then fail again
+        responses = []
+        for _ in range(CIRCUIT_BREAKER_THRESHOLD - 1):
+            responses.append(httpx.Response(200, json=failed_resp))
+        responses.append(httpx.Response(200, json=year_data))
+        for _ in range(CIRCUIT_BREAKER_THRESHOLD - 1):
+            responses.append(httpx.Response(200, json=failed_resp))
+
+        respx.get(url__startswith=f"{api_url}/api/v1/plant/energy/{sample_plant_id}/year").mock(side_effect=responses)
+        await client.async_init()
+
+        # Fail (threshold - 1) times
+        for _ in range(CIRCUIT_BREAKER_THRESHOLD - 1):
+            with pytest.raises(SolarkCloudApiError, match="API request failed"):
+                await client.async_get_energy_year(sample_plant_id, "2024")
+
+        # Success resets the counter
+        result = await client.async_get_energy_year(sample_plant_id, "2024")
+        assert result["success"] is True
+        assert client._consecutive_failures == 0
+
+        # Fail (threshold - 1) more times — circuit should NOT open
+        for _ in range(CIRCUIT_BREAKER_THRESHOLD - 1):
+            with pytest.raises(SolarkCloudApiError, match="API request failed"):
+                await client.async_get_energy_year(sample_plant_id, "2024")
+        assert client._consecutive_failures == CIRCUIT_BREAKER_THRESHOLD - 1
+        # Circuit should still be closed (monotonic time check)
+        assert client._circuit_open_until == 0
+        await client.async_close()

@@ -60,6 +60,10 @@ MIN_PV_POWER_WATTS = 1000
 
 ENERGY_LABELS = ["Load", "PV", "Export", "Import", "Charge", "Discharge"]
 
+# Circuit breaker settings
+CIRCUIT_BREAKER_THRESHOLD = 5
+CIRCUIT_BREAKER_COOLDOWN_SECONDS = 300
+
 # Sol-Ark inverter profiles: model -> specs
 # Sources: Official Sol-Ark datasheets and user manuals
 # max_output: continuous AC output power (W)
